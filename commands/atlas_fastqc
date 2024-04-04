@@ -1,0 +1,49 @@
+import os,subprocess,argparse
+
+#GPT生成的，真要做需要重新check
+
+def extract_samples(input_dir, output_dir, num_lines):
+    """
+    Extracts a specified number of lines from .fq.gz files in a directory,
+    and saves them in a separate directory.
+    """
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+
+    samples_list_path = os.path.join(output_dir, 'samples_list.txt')
+    with open(samples_list_path, 'w') as f:
+        for root, dirs, files in os.walk(input_dir):
+            for file in files:
+                if file.endswith(".fq.gz"):
+                    input_file = os.path.join(root, file)
+                    output_file = os.path.join(output_dir, file[:-6] + '_samples.fq.gz')
+                    subprocess.run(f'gunzip -c {input_file} | head -n {num_lines} | gzip > {output_file}', shell=True)
+                    f.write(output_file + '\n')
+    return samples_list_path
+
+def perform_quality_control(samples_list, fastqc_dir):
+    """
+    Performs quality control checks on the samples using FastQC and MultiQC.
+    """
+    if not os.path.exists(fastqc_dir):
+        os.mkdir(fastqc_dir)
+
+    with open(samples_list, 'r') as file:
+        for sample in file:
+            subprocess.run(f'fastqc {sample.strip()} -o {fastqc_dir}', shell=True)
+
+    subprocess.run(f'multiqc {fastqc_dir} --outdir {fastqc_dir}', shell=True)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Sample Extractor and Quality Control')
+    parser.add_argument('input_dir', type=str, help='Input directory containing .fq.gz files')
+    parser.add_argument('output_dir', type=str, help='Output directory for extracted samples')
+    parser.add_argument('num_lines', type=int, help='Number of lines to extract from each .fq.gz file')
+    parser.add_argument('fastqc_dir', type=str, help='Output directory for FastQC results')
+    args = parser.parse_args()
+
+    samples_list = extract_samples(args.input_dir, args.output_dir, args.num_lines)
+    perform_quality_control(samples_list, args.fastqc_dir)
+
+    # Move directories to TEMP folder
+    subprocess.run(f'mv {args.output_dir} {args.fastqc_dir} ./TEMP/', shell=True)

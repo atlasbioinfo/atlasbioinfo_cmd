@@ -1,0 +1,24 @@
+#!/Users/hyu/anaconda3/bin/python
+# -*- coding: utf-8 -*-
+
+import nmap
+
+# 创建 nmap 扫描对象
+nm = nmap.PortScanner()
+
+# 扫描网络
+nm.scan(hosts='192.168.2.0/24', arguments='-p 80,443')
+
+# 已知的 MAC 地址及其标签
+known_devices = {
+    "EA:E6:DC:7F:6F:3F": "atlas phone",
+}
+
+print("{:<15} {:<20} {}".format("IP Address", "MAC Address", "Label"))
+print("{:<15} {:<20} {}".format("-" * 10, "-" * 10, "-" * 5))
+
+for host in nm.all_hosts():
+    mac_address = nm[host]['addresses'].get('mac', 'Unknown')
+    label = known_devices.get(mac_address, 'Unknown')
+
+    print("{:<15} {:<20} {}".format(host, mac_address, label))

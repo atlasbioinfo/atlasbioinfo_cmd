@@ -1,0 +1,35 @@
+#!/Users/hyu/anaconda3/bin/python
+# -*- coding: utf-8 -*-
+
+import sys
+def contains_flag(flag, check_flag):
+    return (flag & check_flag) == check_flag
+
+flagTags={}
+tname=""
+tinfo=""
+count=0
+with open(sys.argv[1],"r") as f:
+    with open(sys.argv[2],'w') as out:
+        for line in f:
+            if (line[0]=="@"):
+                out.write(line)
+                continue
+            tmp=line.strip().split('\t')
+            if (tname==""):
+                tname=tmp[0]
+                tinfo=line
+                count+=1
+                continue
+            if (tname==tmp[0]):
+                tinfo+=line
+                count+=1
+                continue
+            if (tname!=tmp[0]):
+                if (count==2):
+                    out.write(tinfo)
+                tname=tmp[0]
+                count=1
+                tinfo=line
+        if count==2:
+            out.write(tinfo)

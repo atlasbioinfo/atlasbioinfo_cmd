@@ -1,0 +1,80 @@
+#!/Users/hyu/miniforge3/bin/python
+
+import argparse
+import os,random
+
+#select a file
+#check the size, if more than 100MB
+#make dir and split the file into 85-95MB
+
+def split_file(file_path, size_threshold):
+    file_size = os.path.getsize(file_path)
+    print(f"file size: {file_size}")
+    if file_size < size_threshold*1024*1024:
+        print(f"file size is less than {size_threshold}MB")
+        return
+
+    file_name = os.path.basename(file_path)
+    file_name, file_extension = os.path.splitext(file_name)
+    print(f"file_name: {file_name}")
+    print(f"file_extension: {file_extension}")
+
+    #create a directory
+    dir_name = f"{file_name}_split"
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
+
+    #split the file
+    file_number = 1
+    with open(file_path, "rb") as f:
+        trandsize= random.randint(85*1024*1024,95*1024*1024)
+        chunk_size = trandsize
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            split_file_name = f"{dir_name}/{file_name}_{file_number}{file_extension}"
+            with open(split_file_name, "wb") as split_f:
+                split_f.write(chunk)
+            file_number += 1
+
+    print(f"file split completed, total {file_number-1} files created")
+
+    return
+
+
+
+if __name__ == "__main__":
+
+    logo='''      
+          _   _             ____  _       _        __      
+     /\  | | | |           |  _ \(_)     (_)      / _|     
+    /  \ | |_| | __ _ ___  | |_) |_  ___  _ _ __ | |_ ___  
+   / /\ \| __| |/ _` / __| |  _ <| |/ _ \| | '_ \|  _/ _ \ 
+  / ____ \ |_| | (_| \__ \ | |_) | | (_) | | | | | || (_) |
+ /_/    \_\__|_|\__,_|___/ |____/|_|\___/|_|_| |_|_| \___/  
+
+        `-:-.   ,-;"`-:-.   ,-;"`-:-.   ,-;"`-:-.   ,-;"
+        `=`,'=/     `=`,'=/     `=`,'=/     `=`,'=/
+            y==/        y==/        y==/        y==/
+        ,=,-<=`.    ,=,-<=`.    ,=,-<=`.    ,=,-<=`.
+        ,-'-'   `-=_,-'-'   `-=_,-'-'   `-=_,-'-'   `-=_
+                
+    '''
+
+
+    description_text = '''{} 
+    This script is used to split a big file into smaller files.
+    .'''.format(logo)
+
+    parser = argparse.ArgumentParser(description=description_text, formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument("file", help="file path")
+    parser.add_argument("-s", "--size", help="size threshold in MB", type=int, default=100)
+    
+    args = parser.parse_args()
+    file_path = args.file
+    size_threshold = args.size
+    split_file(file_path, size_threshold)
+
+    
+    

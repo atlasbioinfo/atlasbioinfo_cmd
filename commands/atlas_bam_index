@@ -1,0 +1,34 @@
+#!/Users/hyu/Intel_miniforge3/envs/PYSAM/bin/python
+# -*- coding: utf-8 -*-
+import os
+import subprocess,argparse
+
+# def run_bamindex(samtools_path):
+#     script_path = Path(__file__).parent / 'commands' / 'atlas_bam_index'
+#     command = ["python", str(script_path), '-s', samtools_path]
+#     subprocess.run(command)
+
+def bamindex(samtools_path):
+    count=0
+    countHasNoIndex=0
+    for file in os.listdir("./"):
+        if file.endswith(".bam"):
+            if not os.path.exists(file + ".bai"):
+                countHasNoIndex+=1
+                subprocess.call("nohup "+samtools_path+" index " + file+" &", shell=True)
+            else:
+                count+=1
+
+    print("Total bam files: " + str(count+countHasNoIndex))
+    print("Bam files with index: " + str(count))
+    print("Bam files without index: " + str(countHasNoIndex))
+    print("Indexing...Please check the backend process.")
+
+def main():
+    parser = argparse.ArgumentParser(description='Index BAM files')
+    parser.add_argument('-s', '--samtools_path', type=str, required=True, help='SAMtools path')
+    args = parser.parse_args()
+    bamindex(args.samtools_path)
+
+if __name__ == "__main__":
+    main()

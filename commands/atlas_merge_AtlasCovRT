@@ -1,0 +1,74 @@
+#!/Users/hyu/anaconda3/envs/Mapping/bin/python
+# -*- coding: utf-8 -*-
+
+import gzip,sys,os,argparse
+
+class AtlasMerger:
+    def __init__(self, output_file, input_files):
+        self.output_file = output_file
+        self.input_files = input_files
+        self.rt = {}
+        self.cov = {}
+        
+    def merge_files(self):
+        if not self.input_files:
+            print("Error: No input files provided")
+            return
+
+        first_file = self.input_files.pop(0)
+
+        if not first_file.endswith("gz"):
+            print("Error: not a gzip file")
+            return
+
+        with gzip.open(first_file, "rt", encoding="utf-8") as f:
+            for line in f:
+                tmp = line.strip().split("\t")
+                self.rt[tmp[0]] = tmp[1]
+                self.cov[tmp[0]] = tmp[2]
+
+        for file in self.input_files:
+            with gzip.open(file, "rt", encoding="utf-8") as f:
+                for line in f:
+                    tmp = line.strip().split("\t")
+                    if tmp[0] in self.rt:
+                        trt = self.rt[tmp[0]].split(",")
+                        trt_new = tmp[1].split(",")
+                        tcov = self.cov[tmp[0]].split(",")
+                        tcov_new = tmp[2].split(",")
+                        for i in range(len(trt)):
+                            trt[i] = str(int(trt[i]) + int(trt_new[i]))
+                            tcov[i] = str(int(tcov[i]) + int(tcov_new[i]))
+                        self.rt[tmp[0]] = ",".join(trt)
+                        self.cov[tmp[0]] = ",".join(tcov)
+                    else:
+                        self.rt[tmp[0]] = tmp[1]
+                        self.cov[tmp[0]] = tmp[2]
+
+        with gzip.open(self.output_file, "wt", encoding="utf-8") as f:
+            for key in self.rt:
+                f.write(key + "\t" + self.rt[key] + "\t" + self.cov[key] + "\n")
+        print("Merge completed successfully. Output written to", self.output_file)
+
+    @staticmethod
+    def show_help():
+        atlas_logo_path = os.path.expanduser("~/.atlaslogo")
+        if os.path.isfile(atlas_logo_path):
+            with open(atlas_logo_path, 'r') as f:
+                print(f.read())
+        print("""
+Usage: script_name.py -o OUTPUT_FILE INPUT_FILES... 
+    -o, --output      Output file name
+    INPUT_FILES       Input file names
+""")
+
+if __name__ == "__main__":
+    if '-h' in sys.argv or '--help' in sys.argv:
+        AtlasMerger.show_help()
+    else:
+        parser = argparse.ArgumentParser(description='Merge files.', add_help=False)
+        parser.add_argument('-o', '--output', required=True, help='Output file name')
+        parser.add_argument('input_files', metavar='N', type=str, nargs='+', help='Input file names')
+        args = parser.parse_args()
+        merger = AtlasMerger(args.output, args.input_files)
+        merger.merge_files()

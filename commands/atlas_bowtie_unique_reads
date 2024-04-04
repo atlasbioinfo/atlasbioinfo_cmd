@@ -1,0 +1,91 @@
+#!/bin/bash
+
+
+# 函数：显示帮助信息
+show_help() {
+    cat ~/.atlaslogo
+    echo "Usage: auto_unique_bam.sh -i INPUT_SAM -o OUTPUT_BAM [-e ENV_NAME] [-h]"
+    echo
+    echo "   -i   Input SAM file."
+    echo "   -o   Output BAM file."
+    echo "   -e   Anaconda environment name (default: base)."
+    echo "   -h   Show this help message."
+}
+
+# 默认的 Anaconda 环境名称
+ENV_NAME=base
+
+# 使用 getopts 解析命令行参数
+while getopts "hi:o:e:" opt; do
+    case $opt in
+        i)
+            INPUT_SAM=$OPTARG
+            ;;
+        o)
+            OUTPUT_BAM=$OPTARG
+            ;;
+        e)
+            ENV_NAME=$OPTARG
+            ;;
+        h)
+            show_help
+            exit 0
+            ;;
+        \?)
+            echo "Invalid option: -$OPTARG" >&2
+            show_help
+            exit 1
+            ;;
+        :)
+            echo "Option -$OPTARG requires an argument." >&2
+            show_help
+            exit 1
+            ;;
+    esac
+done
+
+# 检查是否提供了输入和输出文件
+if [[ -z "$INPUT_SAM" || -z "$OUTPUT_BAM" ]]; then
+    echo "Error: Both input and output files are required."
+    show_help
+    exit 1
+fi
+
+# ANACONDA_PATH=~/anaconda3
+
+# # 激活环境
+# source $ANACONDA_PATH/etc/profile.d/conda.sh
+# conda activate $ENV_NAME
+
+samtools view -h $INPUT_SAM | samtools sort -n -o $OUTPUT_BAM.query.temp.sam
+echo "finish sorting"
+# if [ $? -ne 0 ]; then
+#     echo "Error during samtools operation on $INPUT_SAM"
+#     exit 1
+# fi
+
+# # # 运行 Python 脚本
+unique_part $OUTPUT_BAM.query.temp.sam ${OUTPUT_BAM}_unique.sam
+echo "finish unique"
+
+# # if [ $? -ne 0 ]; then
+# #     echo "Error running python script on intermediate.bam"
+# #     exit 1
+# # fi
+
+# # # 再次使用 samtools 进行另一种操作，例如排序
+samtools sort ${OUTPUT_BAM}_unique.sam -o ${OUTPUT_BAM}_unique.sort.bam
+echo "finish sorting"
+# # if [ $? -ne 0 ]; then
+# #     echo "Error during samtools sort on intermediate.bam"
+# #     exit 1
+# # fi
+
+# # # 清理临时文件
+rm $OUTPUT_BAM.query.temp.sam ${OUTPUT_BAM}_unique.sam
+echo "finish cleaning"
+
+# # echo "Processing complete: $OUTPUT_BAM generated."
+
+# # # # 可以选择在此退出环境
+# # # conda deactivate

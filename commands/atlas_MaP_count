@@ -1,0 +1,211 @@
+#!/Users/hyu/miniforge3/bin/python
+
+import pysam, gzip, numpy as np
+import argparse
+
+transNuc={"A":"T","T":"A","C":"G","G":"C","N":"N","-":"-"}
+
+
+def main(input_file, output):
+    samfile = pysam.AlignmentFile(input_file, "rb")
+
+    with gzip.open(output, "wt") as out:
+        out.write(",".join([
+            "gene",
+            "pos",
+            "mutInfoF",
+            "mutCountF",
+            "coverageF",
+            "mutInfoR",
+            "mutCountR",
+            "coverageR",
+        ])+"\n")
+        for tgeno in samfile.header["SQ"]:
+            mutCountF=np.zeros(tgeno["LN"]+1,dtype=int)
+            mutCountR=np.zeros(tgeno["LN"]+1,dtype=int)
+            coverageF=np.zeros(tgeno["LN"]+1,dtype=int)
+            coverageR=np.zeros(tgeno["LN"]+1,dtype=int)
+
+            mutInfo={}
+
+            for read in samfile.fetch(tgeno["SN"]):
+                if read.is_unmapped:
+                    continue
+                # r1r2 = 1 if read.is_read1 else 2
+                # RorF = 1 if read.is_reverse else 0
+                ForR = 1 if read.is_read1 == read.is_reverse else -1
+                
+                mdtag = read.get_tag("MD")
+                tread = read.query_sequence
+                tref = read.get_reference_sequence()
+                tpos=read.get_reference_positions()
+
+                if ForR == 1:
+                    coverageF[tpos] += 1
+                else:
+                    coverageR[tpos] += 1
+
+                tread_trim = []
+                tref_trim = []
+                for tcigar in read.cigar:
+                    if tcigar[0] == 0:
+                        tread_trim.append(tread[:tcigar[1]])
+                        tread = tread[tcigar[1]:]
+                        tref_trim.append(tref[:tcigar[1]])
+                        tref = tref[tcigar[1]:]
+                        continue
+                    if tcigar[0] == 1:
+                        tread_trim.append(tread[:tcigar[1]])
+                        tread = tread[tcigar[1]:]
+                        tref_trim.append("-" * tcigar[1])
+                        continue
+                    if tcigar[0] == 2:
+                        tread_trim.append("-" * tcigar[1])
+                        tref_trim.append(tref[:tcigar[1]])
+                        tref = tref[tcigar[1]:]
+                        continue
+                    if tcigar[0] == 4:
+                        tread = tread[tcigar[1]:]
+
+                tread_trim = "".join(tread_trim).upper()
+                tref_trim = "".join(tref_trim).upper()
+                
+                
+                truePos=-1
+                tgenepos=-1
+                tmutpos=[]
+                tcov=[]
+                
+                for i in range(len(tread_trim)):
+                    if (tread_trim[i]!="-" and tref_trim[i]!="-"):
+                        truePos+=1
+                        tgenepos=tpos[truePos]
+                    if (tread_trim[i]==tref_trim[i]):
+                        continue
+                    #read has deletion
+                    if (tread_trim[i]=="-" and tref_trim[i]!="-"):
+                        tgenepos+=1
+                        tcov.append(tgenepos)
+                        if (tread_trim[i+1]=="-"): #read has double deletion only select last
+                            continue
+                        tmutpos.append(tgenepos)
+                        tlabel=",".join([
+                            tgeno["SN"],
+                            str(ForR),
+                            str(tgenepos),
+                        ])
+                        tinfo=tref_trim[i]+"=>-"
+                        if (tlabel not in mutInfo):
+                            mutInfo[tlabel]=[]
+                        mutInfo[tlabel].append(tinfo)
+                        continue
+                    #read has insertion
+                    if (tread_trim[i]!="-" and tref_trim[i]=="-"):
+                        if (tref_trim[i-1]=="-"): #ref has double deletion only select last
+                            continue
+                        tcov.append(tgenepos)
+                        tmutpos.append(tgenepos)
+                        tlabel=",".join([
+                            tgeno["SN"],
+                            str(ForR),
+                            str(tgenepos),
+                        ])
+                        tinfo="-=>"+tread_trim[i]
+                        if (tlabel not in mutInfo):
+                            mutInfo[tlabel]=[]
+                        mutInfo[tlabel].append(tinfo)
+                        continue
+                    #read has mismatch
+                    if (tread_trim[i]!=tref_trim[i]):
+                        # tcov.append(tgenepos)
+                        tmutpos.append(tgenepos)
+                        tlabel=",".join([
+                            tgeno["SN"],
+                            str(ForR),
+                            str(tgenepos),
+                        ])
+                        tinfo=tref_trim[i]+"=>"+tread_trim[i]
+                        if (tlabel not in mutInfo):
+                            mutInfo[tlabel]=[]
+                        mutInfo[tlabel].append(tinfo)
+                # if (len(tread_trim)-len(tmutpos)<21):
+                #     continue
+                if (ForR == 1):
+                    mutCountF[tmutpos] += 1
+                    # if (misType=="D"):
+                    coverageF[tcov] += 1
+                else:
+                    mutCountR[tmutpos] += 1
+                    # if (misType=="D"):
+                    coverageR[tcov] += 1
+
+            for i in range(len(mutCountF)):
+                tlabelF=",".join([
+                    tgeno["SN"],
+                    str(1),
+                    str(i)
+                ])
+                tlabelR=",".join([
+                    tgeno["SN"],
+                    str(-1),
+                    str(i)
+                ])
+                tForInfo=";".join(mutInfo[tlabelF]) if tlabelF in mutInfo else ""
+                tRevInfo=""
+                if (tlabelR in mutInfo):
+                    newArr=[]
+                    for tinfo in mutInfo[tlabelR]:
+                        tnucs=tinfo.split("=>")
+                        tnucs[0]=transNuc[tnucs[0]]
+                        tnucs[1]=transNuc[tnucs[1]]
+                        tinfo="=>".join(tnucs)
+                        newArr.append(tinfo)
+                    tRevInfo=";".join(newArr)
+
+            
+                out.write(",".join([
+                    tgeno["SN"],
+                    str(i+1),
+                    tForInfo,
+                    str(mutCountF[i]),
+                    str(coverageF[i]),
+                    tRevInfo,
+                    str(mutCountR[i]),
+                    str(coverageR[i]),
+                ])+"\n")
+        
+                
+    samfile.close()
+
+if __name__ == "__main__":
+
+    logo='''      
+          _   _             ____  _       _        __      
+     /\  | | | |           |  _ \(_)     (_)      / _|     
+    /  \ | |_| | __ _ ___  | |_) |_  ___  _ _ __ | |_ ___  
+   / /\ \| __| |/ _` / __| |  _ <| |/ _ \| | '_ \|  _/ _ \ 
+  / ____ \ |_| | (_| \__ \ | |_) | | (_) | | | | | || (_) |
+ /_/    \_\__|_|\__,_|___/ |____/|_|\___/|_|_| |_|_| \___/  
+
+        `-:-.   ,-;"`-:-.   ,-;"`-:-.   ,-;"`-:-.   ,-;"
+        `=`,'=/     `=`,'=/     `=`,'=/     `=`,'=/
+            y==/        y==/        y==/        y==/
+        ,=,-<=`.    ,=,-<=`.    ,=,-<=`.    ,=,-<=`.
+        ,-'-'   `-=_,-'-'   `-=_,-'-'   `-=_,-'-'   `-=_
+                
+    '''
+
+
+    description_text = '''{} 
+This module is used to process DMS-MaP, SHAPE-MaP output to complete the 
+first step after mapping, that is, to obtain mutation, insertion, deletion 
+information. Process BAM files and output into AtlasMaP format.'''.format(logo)
+
+    parser = argparse.ArgumentParser(description=description_text, formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('input_bam', type=str, help='Path to the input indexed BAM file.')
+    parser.add_argument('-o', '--output', type=str, default=None, help='output file name, default is input_file.AtlasMaP')
+    
+    args = parser.parse_args()
+    if args.output is None:
+        args.output = args.input_bam + ".AtlasMaP"
+    main(args.input_bam, args.output)
