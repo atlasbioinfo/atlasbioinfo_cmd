@@ -6,7 +6,7 @@ import argparse
 transNuc={"A":"T","T":"A","C":"G","G":"C","N":"N","-":"-"}
 
 
-def main(input_file, output):
+def main(input_file, output, rna):
     samfile = pysam.AlignmentFile(input_file, "rb")
 
     with gzip.open(output, "wt") as out:
@@ -33,7 +33,12 @@ def main(input_file, output):
                     continue
                 # r1r2 = 1 if read.is_read1 else 2
                 # RorF = 1 if read.is_reverse else 0
-                ForR = 1 if read.is_read1 == read.is_reverse else -1
+                if (rna):
+                    ForR = -1 if read.is_read1 == read.is_reverse else 1
+                else:
+                    ForR = 1 if read.is_read1 == read.is_reverse else -1
+                    if (ForR==-1):
+                        continue
                 
                 mdtag = read.get_tag("MD")
                 tread = read.query_sequence
@@ -203,9 +208,10 @@ information. Process BAM files and output into AtlasMaP format.'''.format(logo)
 
     parser = argparse.ArgumentParser(description=description_text, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('input_bam', type=str, help='Path to the input indexed BAM file.')
+    parser.add_argument('--rna', action='store_true', help='dna model or rna model, default is dna model', default=False)
     parser.add_argument('-o', '--output', type=str, default=None, help='output file name, default is input_file.AtlasMaP')
     
     args = parser.parse_args()
     if args.output is None:
         args.output = args.input_bam + ".AtlasMaP"
-    main(args.input_bam, args.output)
+    main(args.input_bam, args.output, args.rna)

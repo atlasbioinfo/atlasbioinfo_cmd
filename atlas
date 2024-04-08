@@ -11,15 +11,14 @@ logo = '''
 
 env_args = {
         "samtools":"/Users/hyu/Intel_miniforge3/envs/MAPPING/bin/samtools",
+        "pysam":"/Users/hyu/Intel_miniforge3/envs/PYSAM/bin/python",
         "general": "/Users/hyu/miniforge3/bin/python",
         "map": "/Users/hyu/Intel_miniforge3/envs/MAPPING/bin/python",
         "bmap": "/Users/hyu/Intel_miniforge3/envs/BOWTIE2/bin/python"
     }
 
 def main():
-
     args=generate_parser()
-
     if args.command == 'sam2bam':
         run_sam2bam(args.samtools, args.threads)
 
@@ -28,6 +27,10 @@ def main():
 
     if args.command == 'check_big_file':
         check_big_file(args.size, args.compress)
+
+    if args.command == 'dmsmap':
+        run_dmsmap(env_args["pysam"],args.input_bam, args.output, args.rna)
+
 
 def generate_parser():
     parser = argparse.ArgumentParser(description='Atlas: A wrapper for utility commands.')
@@ -47,6 +50,14 @@ def generate_parser():
     ''')
     bamindex_parser.add_argument('-s', '--samtools', type=str, default=env_args['samtools'], help='Path to samtools')
 
+    dmsmap_parser=subparsers.add_parser('dmsmap', help='''
+        This module is used to process DMS-MaP, SHAPE-MaP output to complete the
+        first step after mapping, that is, to obtain mutation, insertion, deletion
+        information. Process BAM files and output into AtlasMaP format.
+    ''')
+    dmsmap_parser.add_argument('input_bam', type=str, help='Path to the input indexed BAM file.')
+    dmsmap_parser.add_argument('--rna', action='store_true', help='dna model or rna model, default is dna model', default=False)
+    dmsmap_parser.add_argument('-o', '--output', type=str, default=None, help='output file name, default is input_file.AtlasMaP')
 
     sam2bam_parser=subparsers.add_parser('sam2bam', help='''
         scan folder and convert sam to bam file.
@@ -56,6 +67,16 @@ def generate_parser():
     argcomplete.autocomplete(parser)
 
     return parser.parse_args()
+
+def run_dmsmap(python_path, input_bam, output, rna):
+    script_path = Path(__file__).parent / 'commands' / 'atlas_MaP_count'
+    command = [python_path, str(script_path), input_bam]
+    if output:
+        command.extend(['-o', output])
+    if rna:
+        command.append('--rna')
+
+    subprocess.run(command)
 
 def run_sam2bam(samtools_path, threads):
     script_path = Path(__file__).parent / 'commands' / 'sam2bam'
