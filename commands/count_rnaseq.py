@@ -1,7 +1,6 @@
-#!/Users/hyu/Intel_miniforge3/envs/PYSAM/bin/python
-# -*- coding: utf-8 -*-
-
 import os,pysam,argparse
+import subprocess
+from pathlib import Path
 
 def is_bam_file(filepath):
     try:
@@ -44,20 +43,32 @@ def check_bam_file(input_bam):
         print(input_bam, " is indexed")
     return True
 
-def check_read(read,count_strand):
-    if (count_strand=="B"):
+def check_read(read, count_strand):
+    if count_strand == "B":
         return True
-    if (count_strand=="F"):
-        if (read.is_read1 != read.is_reverse):
-            return True
-    if (count_strand=="R"):
-        if (read.is_read1 == read.is_reverse):
-            return True
+    if count_strand == "F":
+        if read.is_paired:
+            # For paired-end reads
+            return not read.is_reverse  # Count both reads if they are on the forward strand
+        else:
+            # For single-end reads
+            return not read.is_reverse
+    if count_strand == "R":
+        if read.is_paired:
+            # For paired-end reads
+            return read.is_reverse  # Count both reads if they are on the reverse strand
+        else:
+            # For single-end reads
+            return read.is_reverse
     return False
 
-def main(input_bam,count_strand="F",output_file=None):
+def run(input_bam, count_strand="F", output_file=None):
     if not check_bam_file(input_bam):
         return False
+    
+    if output_file is None:
+        output_file = input_bam + ".count"
+    
     # limit=100000
     bamfile=pysam.AlignmentFile(input_bam, "rb")
     
@@ -91,37 +102,47 @@ def main(input_bam,count_strand="F",output_file=None):
     print("Mapped rate: ",str(round((all_reads-unmapped_count)/all_reads,4)*100)+"%")
     print("Counted reads: ",counted_reads," Rate: ",str(round(counted_reads/all_reads,4)*100)+"%")
 
-            
-if __name__=="__main__":
+def run_count_rnaseq_with_pysam(pysam_python, args):
+    if pysam_python is None:
+        print("Error: pysam_python path is None. Please make sure the pysam environment is properly set up.")
+        return
 
-    logo='''      
-          _   _             ____  _       _        __      
-     /\  | | | |           |  _ \(_)     (_)      / _|     
-    /  \ | |_| | __ _ ___  | |_) |_  ___  _ _ __ | |_ ___  
-   / /\ \| __| |/ _` / __| |  _ <| |/ _ \| | '_ \|  _/ _ \ 
-  / ____ \ |_| | (_| \__ \ | |_) | | (_) | | | | | || (_) |
- /_/    \_\__|_|\__,_|___/ |____/|_|\___/|_|_| |_|_| \___/  
-
-        `-:-.   ,-;"`-:-.   ,-;"`-:-.   ,-;"`-:-.   ,-;"
-        `=`,'=/     `=`,'=/     `=`,'=/     `=`,'=/
-            y==/        y==/        y==/        y==/
-        ,=,-<=`.    ,=,-<=`.    ,=,-<=`.    ,=,-<=`.
-        ,-'-'   `-=_,-'-'   `-=_,-'-'   `-=_,-'-'   `-=_
-                
-    '''
-
-
-    description_text = '''{} 
-        "atlas_test_bam" is a tool to test the mapping rate and the strandness of the input BAM file. '''.format(logo)
-
-    parser = argparse.ArgumentParser(description=description_text, formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument('input_bam', type=str, help='Path to the input indexed BAM file.')
-    parser.add_argument('-s','--count_strand', type=str, default="F", help='Strand to count: F (forward), R (reverse), B (both). Default: F')
-    parser.add_argument('--output', type=str, help='Path to the output file.')
-
-    args = parser.parse_args()
+    script_path = Path(__file__).resolve()
+    command = [
+        pysam_python,
+        str(script_path),
+        args.input_bam,
+    ]
     
+    if hasattr(args, 'count_strand'):
+        command.extend(['-s', args.count_strand])
+    
+    if hasattr(args, 'output') and args.output:
+        command.extend(['-o', args.output])
+
+    try:
+        subprocess.run(command, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error running count_rnaseq: {e}")
+    except FileNotFoundError:
+        print(f"Error: Could not find the pysam Python interpreter at {pysam_python}")
+
+def add_parser(subparsers):
+    parser = subparsers.add_parser('count_rnaseq', help='Count reads in RNA-seq BAM file')
+    parser.add_argument('input_bam', type=str, help='Path to the input indexed BAM file.')
+    parser.add_argument('-s', '--count_strand', type=str, default="F", choices=['F', 'R', 'B'],
+                        help='Strand to count: F (forward), R (reverse), B (both). Default: F')
+    parser.add_argument('-o', '--output', type=str, help='Path to the output file. If not specified, uses input_bam + ".count"')
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Count reads in RNA-seq BAM file')
+    parser.add_argument('input_bam', type=str, help='Path to the input indexed BAM file.')
+    parser.add_argument('-s', '--count_strand', type=str, default="F", choices=['F', 'R', 'B'],
+                        help='Strand to count: F (forward), R (reverse), B (both). Default: F')
+    parser.add_argument('-o', '--output', type=str, help='Path to the output file. If not specified, uses input_bam + ".count"')
+    args = parser.parse_args()
+
     if args.output is None:
         args.output = args.input_bam + ".count"
-    
-    main(args.input_bam,args.count_strand,args.output)
+
+    run(args.input_bam, args.count_strand, args.output)

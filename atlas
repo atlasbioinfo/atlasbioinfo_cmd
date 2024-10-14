@@ -1,17 +1,28 @@
-#!/Users/hyu/miniforge3/bin/python
+#!/Users/hyu/Intel_miniforge3/envs/ATLAS/bin/python
 
 import argparse, argcomplete
-import json, os
+import json, os, sys
 import subprocess
 import logging
-import json
 from pathlib import Path
-from commands import sam2bam, initialize, bamindex
+from commands import sam2bam, initialize, bamindex, count_rnaseq
 
 
 
 logo = '''      
-              atlas  
+          _   _             ____  _       _        __      
+     /\  | | | |           |  _ \(_)     (_)      / _|     
+    /  \ | |_| | __ _ ___  | |_) |_  ___  _ _ __ | |_ ___  
+   / /\ \| __| |/ _` / __| |  _ <| |/ _ \| | '_ \|  _/ _ \ 
+  / ____ \ |_| | (_| \__ \ | |_) | | (_) | | | | | || (_) |
+ /_/    \_\__|_|\__,_|___/ |____/|_|\___/|_|_| |_|_| \___/  
+
+        `-:-.   ,-;"`-:-.   ,-;"`-:-.   ,-;"`-:-.   ,-;"
+        `=`,'=/     `=`,'=/     `=`,'=/     `=`,'=/
+            y==/        y==/        y==/        y==/
+        ,=,-<=`.    ,=,-<=`.    ,=,-<=`.    ,=,-<=`.
+        ,-'-'   `-=_,-'-'   `-=_,-'-'   `-=_,-'-'   `-=_
+                
     '''
 
 # if not os.path.exists('config.json'):
@@ -44,6 +55,7 @@ def generate_parser():
     sam2bam.add_parser(subparsers)
     initialize.add_parser(subparsers)
     bamindex.add_parser(subparsers)
+    count_rnaseq.add_parser(subparsers)
     # check_big_file.add_subparser(subparsers)
     # dmsmap.add_subparser(subparsers)
     # cov_rt_count.add_subparser(subparsers)
@@ -51,32 +63,32 @@ def generate_parser():
     argcomplete.autocomplete(parser)
     return parser.parse_args()
 
+
 def main():
     args = generate_parser()
-    print(args)
+    
+    # Get the pysam environment's Python interpreter path
+    pysam_python = env_args.get('pysam')
+    if not pysam_python:
+        logging.error("pysam Python path not found in env_vars.json. Please run 'atlas init' first.")
+        exit(1)
+    
+    if not os.path.exists(pysam_python):
+        logging.error(f"pysam Python interpreter not found at {pysam_python}. Please check your environment setup.")
+        exit(1)
+
     command_map = {
         'init': lambda: initialize.initialize_environment(args.config),
         'sam2bam': lambda: sam2bam.run(env_args['samtools'], args.threads),
         'bamindex': lambda: bamindex.run(env_args['samtools']),
-        # 'check_big_file': check_big_file.run,
-        # 'dmsmap': dmsmap.run,
-        # 'cov_rt_count': cov_rt_count.run,
+        'count_rnaseq': lambda: count_rnaseq.run_count_rnaseq_with_pysam(pysam_python, args),
     }
+    
     if args.command in command_map:
         # Call the appropriate function with the parsed arguments
         command_map[args.command]()
     else:
         logging.error(f"Unknown command: {args.command}")
-    
-    # elif args.command == 'bamindex':
-    #     bamindex.run(args.samtools)
-    # elif args.command == 'check_big_file':
-    #     check_big_file.run(args.size, args.compress)
-    # elif args.command == 'dmsmap':
-    #     dmsmap.run(args.pysam, args.input_bam, args.output, args.rna)
-    # elif args.command == 'cov_rt_count':
-    #     cov_rt_count.run(args.pysam, args.input_bam, args.output, args.all, args.fasta)
-
 # def main():
 #     args=generate_parser()
 
