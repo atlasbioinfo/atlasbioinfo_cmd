@@ -1,5 +1,3 @@
-Certainly! Here's a README for this code library in British English:
-
 # Atlas Bioinformatics Toolkit
 
 Atlas is a comprehensive bioinformatics toolkit designed to streamline various genomic analysis tasks. This collection of Python scripts and utilities provides a robust set of tools for processing and analysing genomic data.
