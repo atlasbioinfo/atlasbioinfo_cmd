@@ -1,134 +1,193 @@
 #!/Users/hyu/miniforge3/bin/python
 
-import argparse,argcomplete
-import json
+import argparse, argcomplete
+import json, os
 import subprocess
+import logging
+import json
 from pathlib import Path
+from commands import sam2bam, initialize
+
+
 
 logo = '''      
               atlas  
     '''
 
-env_args = {
-        "samtools":"/Users/hyu/Intel_miniforge3/envs/MAPPING/bin/samtools",
-        "pysam":"/Users/hyu/Intel_miniforge3/envs/PYSAM/bin/python",
-        "general": "/Users/hyu/miniforge3/bin/python",
-        "map": "/Users/hyu/Intel_miniforge3/envs/MAPPING/bin/python",
-        "bmap": "/Users/hyu/Intel_miniforge3/envs/BOWTIE2/bin/python"
-    }
+# if not os.path.exists('config.json'):
+#     logging.error("Config file 'config.json' not found. Please ensure the file exists.")
+#     exit(1)
+# config_file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'config.json'))
 
-def main():
-    args=generate_parser()
 
-    if args.command == 'sam2bam':
-        run_sam2bam(args.samtools, args.threads)
+# env_vars_path = Path(__file__).parent / 'utils' / 'env_vars.json'
+# if not env_vars_path.exists():
+#     logging.error("env_vars.json file not found. Please run initialize_environment() first.")
+#     exit(1)
 
-    if args.command == 'bamindex':
-        run_bamindex(args.samtools)
+# try:
+#     with open(env_vars_path, 'r') as f:
+#         env_args = json.load(f)
+# except json.JSONDecodeError:
+#     logging.error("env_vars.json is not a valid JSON file.")
+#     exit(1)
 
-    if args.command == 'check_big_file':
-        check_big_file(args.size, args.compress)
-
-    if args.command == 'dmsmap':
-        run_dmsmap(env_args["pysam"],args.input_bam, args.output, args.rna)
-
-    if args.command == 'cov_rt_count':
-        run_cov_rt_count(env_args["pysam"], args.input_bam, args.output, args.all, args.fasta)
-
+# # Check if the software paths exist
+# for software, path in env_args.items():
+#     if not Path(path).exists():
+#         logging.error(f"{software} not found at {path}. Please check your environment setup.")
+#         exit(1)
 
 def generate_parser():
     parser = argparse.ArgumentParser(description='Atlas: A wrapper for utility commands.')
     subparsers = parser.add_subparsers(dest='command')
-
-##################  check_big_file  ##################
-    check_big_file_parser = subparsers.add_parser('check_big_file', help='''
-        This script is used to check the size of all files in a directory.
-        If the file size is larger than 100MB, it will be printed out.
-        -z to compress the output file.
-        .''')
-    check_big_file_parser.add_argument('-s', '--size', type=int, default=100, help='File size threshold in MB, default is 100MB')
-    check_big_file_parser.add_argument('-z', '--compress', action='store_true', help='Compress the file')
-    check_big_file_parser.set_defaults(func=check_big_file)
-
-##################  bamindex  ##################
-    bamindex_parser=subparsers.add_parser('bamindex', help='''
-        scan folder and index bam file.
-    ''')
-    bamindex_parser.add_argument('-s', '--samtools', type=str, default=env_args['samtools'], help='Path to samtools')
-
-
-##################  dmsmap  ##################
-    dmsmap_parser=subparsers.add_parser('dmsmap', help='''
-        This module is used to process DMS-MaP, SHAPE-MaP output to complete the
-        first step after mapping, that is, to obtain mutation, insertion, deletion
-        information. Process BAM files and output into AtlasMaP format.
-    ''')
-    dmsmap_parser.add_argument('input_bam', type=str, help='Path to the input indexed BAM file.')
-    dmsmap_parser.add_argument('--rna', action='store_true', help='dna model or rna model, default is dna model', default=False)
-    dmsmap_parser.add_argument('-o', '--output', type=str, default=None, help='output file name, default is input_file.AtlasMaP')
-
-##################  sam2bam  ##################
-    sam2bam_parser=subparsers.add_parser('sam2bam', help='''
-        scan folder and convert sam to bam file.
-    ''')
-    sam2bam_parser.add_argument('-s', '--samtools', type=str, default=env_args['samtools'], help='Path to samtools')
-    sam2bam_parser.add_argument('-t', '--threads', type=int, default=8, help='Number of threads to use')
-    
-
-##################  atlas_count  ##################
-    atlascount_parser=subparsers.add_parser('cov_rt_count', help='''
-        atlas_coverage_count" processes a "indexed BAM" file to calculate and output the coverage and position counts for each reference, discarding reverse strand reads, and saves the statistics in a ".count" appended file, with a tab-separated format of Reference Name, position counts, and cumulative coverages.
-    ''')
-
-    atlascount_parser.add_argument('input_bam', type=str, help='Path to the input indexed BAM file.')
-    atlascount_parser.add_argument('-o', '--output', type=str, default=None, help='output file name, default is input_file.AtlasCovRT')
-    atlascount_parser.add_argument('-a', '--all', type=bool, default=False, help='output all reads, include the antisense stranded reads, default is False')
-    atlascount_parser.add_argument('-f', '--fasta', type=str, default=None, help='Path to the reference fasta file, default is None')
+    sam2bam.add_parser(subparsers)
+    initialize.add_parser(subparsers)
+    # bamindex.add_subparser(subparsers)
+    # check_big_file.add_subparser(subparsers)
+    # dmsmap.add_subparser(subparsers)
+    # cov_rt_count.add_subparser(subparsers)
 
     argcomplete.autocomplete(parser)
     return parser.parse_args()
 
-def run_cov_rt_count(python_path, input_bam, output, all, fasta):
-    script_path = Path(__file__).parent / 'commands' / 'atlas_coverage_count'
-    command = [python_path, str(script_path), input_bam]
-    if output:
-        command.extend(['-o', output])
-    if all:
-        command.append('--all')
-    if fasta:
-        command.extend(['-f', fasta])
+def main():
+    args = generate_parser()
+    print(args)
+    command_map = {
+        'init': lambda: initialize.initialize_environment(args.config),
+        'sam2bam': lambda: sam2bam.run(env_args['samtools'], args.threads),
+        # 'bamindex': bamindex.run,
+        # 'check_big_file': check_big_file.run,
+        # 'dmsmap': dmsmap.run,
+        # 'cov_rt_count': cov_rt_count.run,
+    }
+    if args.command in command_map:
+        # Call the appropriate function with the parsed arguments
+        command_map[args.command]()
+    else:
+        logging.error(f"Unknown command: {args.command}")
+    
+    # elif args.command == 'bamindex':
+    #     bamindex.run(args.samtools)
+    # elif args.command == 'check_big_file':
+    #     check_big_file.run(args.size, args.compress)
+    # elif args.command == 'dmsmap':
+    #     dmsmap.run(args.pysam, args.input_bam, args.output, args.rna)
+    # elif args.command == 'cov_rt_count':
+    #     cov_rt_count.run(args.pysam, args.input_bam, args.output, args.all, args.fasta)
 
-    subprocess.run(command)
+# def main():
+#     args=generate_parser()
 
-def run_dmsmap(python_path, input_bam, output, rna):
-    script_path = Path(__file__).parent / 'commands' / 'atlas_MaP_count'
-    command = [python_path, str(script_path), input_bam]
-    if output:
-        command.extend(['-o', output])
-    if rna:
-        command.append('--rna')
+#     if args.command == 'sam2bam':
+#         run_sam2bam(args.samtools, args.threads)
 
-    subprocess.run(command)
+#     if args.command == 'bamindex':
+#         run_bamindex(args.samtools)
 
-def run_sam2bam(samtools_path, threads):
-    script_path = Path(__file__).parent / 'commands' / 'sam2bam'
-    command = ["python",str(script_path), '-s', samtools_path, '-t', str(threads)]
-    subprocess.run(command)
+#     if args.command == 'check_big_file':
+#         check_big_file(args.size, args.compress)
 
-def check_big_file(size, compress):
-    script_path = Path(__file__).parent / 'commands' / 'atlas_check_big_file.py'
-    command = ["python", str(script_path), '-s', str(size)]
-    if compress:
-        command.append('-z')
-    subprocess.run(command)
+#     if args.command == 'dmsmap':
+#         run_dmsmap(env_args["pysam"],args.input_bam, args.output, args.rna)
 
-def run_bamindex(samtools_path):
-    script_path = Path(__file__).parent / 'commands' / 'atlas_bam_index'
-    command = ["python", str(script_path), '-s', samtools_path]
-    subprocess.run(command)
+#     if args.command == 'cov_rt_count':
+#         run_cov_rt_count(env_args["pysam"], args.input_bam, args.output, args.all, args.fasta)
 
-def run_ls_command():
-    subprocess.run(['ls', '-lsht', '--color=always'])
+
+
+# def generate_parser():
+#     parser = argparse.ArgumentParser(description='Atlas: A wrapper for utility commands.')
+#     subparsers = parser.add_subparsers(dest='command')
+
+# ##################  check_big_file  ##################
+#     check_big_file_parser = subparsers.add_parser('check_big_file', help='''
+#         This script is used to check the size of all files in a directory.
+#         If the file size is larger than 100MB, it will be printed out.
+#         -z to compress the output file.
+#         .''')
+#     check_big_file_parser.add_argument('-s', '--size', type=int, default=100, help='File size threshold in MB, default is 100MB')
+#     check_big_file_parser.add_argument('-z', '--compress', action='store_true', help='Compress the file')
+#     check_big_file_parser.set_defaults(func=check_big_file)
+
+# ##################  bamindex  ##################
+#     bamindex_parser=subparsers.add_parser('bamindex', help='''
+#         scan folder and index bam file.
+#     ''')
+#     bamindex_parser.add_argument('-s', '--samtools', type=str, default=env_args['samtools'], help='Path to samtools')
+
+
+# ##################  dmsmap  ##################
+#     dmsmap_parser=subparsers.add_parser('dmsmap', help='''
+#         This module is used to process DMS-MaP, SHAPE-MaP output to complete the
+#         first step after mapping, that is, to obtain mutation, insertion, deletion
+#         information. Process BAM files and output into AtlasMaP format.
+#     ''')
+#     dmsmap_parser.add_argument('input_bam', type=str, help='Path to the input indexed BAM file.')
+#     dmsmap_parser.add_argument('--rna', action='store_true', help='dna model or rna model, default is dna model', default=False)
+#     dmsmap_parser.add_argument('-o', '--output', type=str, default=None, help='output file name, default is input_file.AtlasMaP')
+
+# ##################  sam2bam  ##################
+#     sam2bam_parser=subparsers.add_parser('sam2bam', help='''
+#         scan folder and convert sam to bam file.
+#     ''')
+#     sam2bam_parser.add_argument('-s', '--samtools', type=str, default=env_args['samtools'], help='Path to samtools')
+#     sam2bam_parser.add_argument('-t', '--threads', type=int, default=8, help='Number of threads to use')
+    
+
+# ##################  atlas_count  ##################
+#     atlascount_parser=subparsers.add_parser('cov_rt_count', help='''
+#         atlas_coverage_count" processes a "indexed BAM" file to calculate and output the coverage and position counts for each reference, discarding reverse strand reads, and saves the statistics in a ".count" appended file, with a tab-separated format of Reference Name, position counts, and cumulative coverages.
+#     ''')
+
+#     atlascount_parser.add_argument('input_bam', type=str, help='Path to the input indexed BAM file.')
+#     atlascount_parser.add_argument('-o', '--output', type=str, default=None, help='output file name, default is input_file.AtlasCovRT')
+#     atlascount_parser.add_argument('-a', '--all', type=bool, default=False, help='output all reads, include the antisense stranded reads, default is False')
+#     atlascount_parser.add_argument('-f', '--fasta', type=str, default=None, help='Path to the reference fasta file, default is None')
+
+#     argcomplete.autocomplete(parser)
+#     return parser.parse_args()
+
+# def run_cov_rt_count(python_path, input_bam, output, all, fasta):
+#     script_path = Path(__file__).parent / 'commands' / 'atlas_coverage_count'
+#     command = [python_path, str(script_path), input_bam]
+#     if output:
+#         command.extend(['-o', output])
+#     if all:
+#         command.append('--all')
+#     if fasta:
+#         command.extend(['-f', fasta])
+
+# def run_dmsmap(python_path, input_bam, output, rna):
+#     script_path = Path(__file__).parent / 'commands' / 'atlas_MaP_count'
+#     command = [python_path, str(script_path), input_bam]
+#     if output:
+#         command.extend(['-o', output])
+#     if rna:
+#         command.append('--rna')
+
+#     subprocess.run(command)
+
+# def run_sam2bam(samtools_path, threads):
+#     script_path = Path(__file__).parent / 'commands' / 'sam2bam'
+#     command = ["python",str(script_path), '-s', samtools_path, '-t', str(threads)]
+#     subprocess.run(command)
+
+# def check_big_file(size, compress):
+#     script_path = Path(__file__).parent / 'commands' / 'atlas_check_big_file.py'
+#     command = ["python", str(script_path), '-s', str(size)]
+#     if compress:
+#         command.append('-z')
+#     subprocess.run(command)
+
+# def run_bamindex(samtools_path):
+#     script_path = Path(__file__).parent / 'commands' / 'atlas_bam_index'
+#     command = ["python", str(script_path), '-s', samtools_path]
+#     subprocess.run(command)
+
+# def run_ls_command():
+#     subprocess.run(['ls', '-lsht', '--color=always'])
 
 if __name__ == '__main__':
     main()

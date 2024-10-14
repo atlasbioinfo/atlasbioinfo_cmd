@@ -1,0 +1,4 @@
+{
+    "samtools": "/Users/hyu/Intel_miniforge3/envs/ATLAS/bin/samtools",
+    "pysam": "/Users/hyu/Intel_miniforge3/envs/ATLAS/bin/python"
+}
