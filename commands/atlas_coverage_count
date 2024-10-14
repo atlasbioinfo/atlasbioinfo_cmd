@@ -22,7 +22,18 @@ def combine4Arr(arrs):
         cArr.append(str(arrs[0][i]+arrs[1][i]+arrs[2][i]+arrs[3][i]))
     return ",".join(cArr)
 
-def main(input_file, output, reads_all):
+def main(input_file, output, reads_all, fasta):
+    if (fasta is not None):
+        seq={}
+        with open(fasta) as f:
+            fcont=f.read().split(">")
+            for cont in fcont[1:]:
+                tmp=cont.split("\n")
+                tname=re.split("\s+",tmp[0])[0]
+                # tname=tmp[0].split(" ")[0]
+                tseq="".join(tmp[1:])
+                seq[tname]=tseq.upper()
+
     beg=time.time()
     bamfile=pysam.AlignmentFile(input_file, "rb")
 
@@ -57,12 +68,20 @@ def main(input_file, output, reads_all):
             genePos=[str(i) for i in genePos]
             geneCov=[str(i) for i in geneCov]
 
-            out.write("\t".join([
-                tname,
-                ",".join(genePos),
-                ",".join(geneCov)
-            ])+"\n")
-    # print(count)
+            if (fasta is not None):
+                out.write("\t".join([
+                    tname,
+                    seq[tname],
+                    ",".join(genePos),
+                    ",".join(geneCov)
+                ])+"\n")
+            else:    
+                out.write("\t".join([
+                    tname,
+                    ",".join(genePos),
+                    ",".join(geneCov)
+                ])+"\n")
+    
     if (reads_all):
         print("Total reads: "+str(calculate_reads))
     else:
@@ -95,10 +114,11 @@ if __name__=="__main__":
 
     parser = argparse.ArgumentParser(description=description_text, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('input_bam', type=str, help='Path to the input indexed BAM file.')
+    parser.add_argument('-f', '--fasta', type=str, default=None, help='Path to the reference fasta file, default is None')
     parser.add_argument('-o', '--output', type=str, default=None, help='output file name, default is input_file.AtlasCovRT')
     parser.add_argument('-a', '--all', type=bool, default=False, help='output all reads, include the antisense stranded reads, default is False')
     
     args = parser.parse_args()
     if args.output is None:
         args.output = args.input_bam + ".AtlasCovRT"
-    main(args.input_bam, args.output, args.all)
+    main(args.input_bam, args.output, args.all, args.fasta)

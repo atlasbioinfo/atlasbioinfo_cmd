@@ -37,8 +37,8 @@ def main(input_file, output, rna):
                     ForR = -1 if read.is_read1 == read.is_reverse else 1
                 else:
                     ForR = 1 if read.is_read1 == read.is_reverse else -1
-                    if (ForR==-1):
-                        continue
+                    # if (ForR==-1):
+                    #     continue
                 
                 mdtag = read.get_tag("MD")
                 tread = read.query_sequence
