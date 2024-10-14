@@ -6,7 +6,7 @@ import subprocess
 import logging
 import json
 from pathlib import Path
-from commands import sam2bam, initialize
+from commands import sam2bam, initialize, bamindex
 
 
 
@@ -20,17 +20,17 @@ logo = '''
 # config_file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'config.json'))
 
 
-# env_vars_path = Path(__file__).parent / 'utils' / 'env_vars.json'
-# if not env_vars_path.exists():
-#     logging.error("env_vars.json file not found. Please run initialize_environment() first.")
-#     exit(1)
+env_vars_path = Path(__file__).parent / 'utils' / 'env_vars.json'
+if not env_vars_path.exists():
+    logging.error("env_vars.json file not found. Please run initialize_environment() first.")
+    exit(1)
 
-# try:
-#     with open(env_vars_path, 'r') as f:
-#         env_args = json.load(f)
-# except json.JSONDecodeError:
-#     logging.error("env_vars.json is not a valid JSON file.")
-#     exit(1)
+try:
+    with open(env_vars_path, 'r') as f:
+        env_args = json.load(f)
+except json.JSONDecodeError:
+    logging.error("env_vars.json is not a valid JSON file.")
+    exit(1)
 
 # # Check if the software paths exist
 # for software, path in env_args.items():
@@ -43,7 +43,7 @@ def generate_parser():
     subparsers = parser.add_subparsers(dest='command')
     sam2bam.add_parser(subparsers)
     initialize.add_parser(subparsers)
-    # bamindex.add_subparser(subparsers)
+    bamindex.add_parser(subparsers)
     # check_big_file.add_subparser(subparsers)
     # dmsmap.add_subparser(subparsers)
     # cov_rt_count.add_subparser(subparsers)
@@ -57,7 +57,7 @@ def main():
     command_map = {
         'init': lambda: initialize.initialize_environment(args.config),
         'sam2bam': lambda: sam2bam.run(env_args['samtools'], args.threads),
-        # 'bamindex': bamindex.run,
+        'bamindex': lambda: bamindex.run(env_args['samtools']),
         # 'check_big_file': check_big_file.run,
         # 'dmsmap': dmsmap.run,
         # 'cov_rt_count': cov_rt_count.run,

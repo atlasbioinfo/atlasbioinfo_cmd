@@ -23,7 +23,8 @@ Atlas is a comprehensive bioinformatics toolkit designed to streamline various g
 
 2. Set up the Conda environment:
    ```
-   conda env create -f environment.yml
+   mamba install python=3.11
+   mamba install -c bioconda bowtie2 hisat2 samtools
    ```
 
 3. Activate the environment:
