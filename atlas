@@ -65,6 +65,7 @@ def generate_parser():
 
 
 def main():
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
     args = generate_parser()
     
     # Get the pysam environment's Python interpreter path

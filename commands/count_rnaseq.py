@@ -1,6 +1,7 @@
 import os,pysam,argparse
 import subprocess
 from pathlib import Path
+import logging
 
 def is_bam_file(filepath):
     try:
@@ -43,33 +44,97 @@ def check_bam_file(input_bam):
         print(input_bam, " is indexed")
     return True
 
-def check_read(read, count_strand):
-    if count_strand == "B":
+def check_read(read, count_strand, dna):
+    if count_strand == "B":  # Count both strands
         return True
-    if count_strand == "F":
+        
+    if dna:
         if read.is_paired:
-            # For paired-end reads
-            return not read.is_reverse  # Count both reads if they are on the forward strand
+            is_forward = (read.is_read1 and not read.is_reverse) or (read.is_read2 and read.is_reverse)
         else:
-            # For single-end reads
-            return not read.is_reverse
-    if count_strand == "R":
+            #可能有问题
+            is_forward = not read.is_reverse
+    else:  
         if read.is_paired:
-            # For paired-end reads
-            return read.is_reverse  # Count both reads if they are on the reverse strand
+            is_forward = (read.is_read1 and read.is_reverse) or (read.is_read2 and not read.is_reverse)
         else:
-            # For single-end reads
-            return read.is_reverse
+            #可能有问题
+            is_forward = not read.is_reverse
+    
+    if count_strand == "F":  # Forward strand
+        return is_forward
+    elif count_strand == "R":  # Reverse strand
+        return not is_forward
+    
     return False
 
-def run(input_bam, count_strand="F", output_file=None):
+def run_test(input_bam, count_strand="F", output_file=None, dna=False):
     if not check_bam_file(input_bam):
         return False
     
     if output_file is None:
+        output_file = input_bam + ".test.count"
+    
+    bamfile = pysam.AlignmentFile(input_bam, "rb")
+    
+    # 统计变量初始化
+    all_reads = 0
+    unmapped_count = 0
+    counted_reads = 0
+    paired_reads = 0
+    single_reads = 0
+    test_limit = 10000  # 测试读取的reads数量限制
+    
+    print("\nTest Mode - Sampling first", test_limit, "reads...")
+    
+    for read in bamfile.fetch(until_eof=True):
+        if all_reads >= test_limit:
+            break
+            
+        all_reads += 1
+        
+        # 统计配对和单端reads
+        if read.is_paired:
+            paired_reads += 1
+        else:
+            single_reads += 1
+            
+        # 统计未比对reads
+        if read.is_unmapped:
+            unmapped_count += 1
+            continue
+            
+        # 根据链特异性统计
+        if check_read(read, count_strand, dna):
+            counted_reads += 1
+    
+    # 计算统计结果
+    mapped_rate = round((all_reads - unmapped_count) / all_reads * 100, 2)
+    counted_rate = round(counted_reads / all_reads * 100, 2)
+    paired_rate = round(paired_reads / all_reads * 100, 2)
+    
+    # 输出统计结果
+    print("\nTest Results:")
+    print(f"Total reads sampled: {all_reads}")
+    print(f"Mapped rate: {mapped_rate}%")
+    print(f"Counted reads: {counted_reads} ({counted_rate}%)")
+    print(f"Library type:")
+    print(f"  - Paired-end reads: {paired_reads} ({paired_rate}%)")
+    print(f"  - Single-end reads: {single_reads} ({100-paired_rate}%)")
+    print(f"Strand counting mode: {count_strand}")
+    
+    bamfile.close()
+    return True
+
+def run(input_bam, count_strand="F", output_file=None, dna=False):
+    logging.info("Running count mode...")
+    if not check_bam_file(input_bam):
+        return False
+    
+
+    if output_file is None:
         output_file = input_bam + ".count"
     
-    # limit=100000
     bamfile=pysam.AlignmentFile(input_bam, "rb")
     
     all_reads=0
@@ -92,7 +157,7 @@ def run(input_bam, count_strand="F", output_file=None):
                 if (read.is_unmapped):
                     unmapped_count+=1
                     continue
-                if check_read(read,count_strand):
+                if check_read(read,count_strand,dna):
                     counted_reads+=1
                     tcount+=1
             out.write("\t".join([tname,tlen,str(tcount)])+"\n")
@@ -113,12 +178,18 @@ def run_count_rnaseq_with_pysam(pysam_python, args):
         str(script_path),
         args.input_bam,
     ]
+
+    if hasattr(args, 'dna') and args.dna:
+        command.append('-d')
     
     if hasattr(args, 'count_strand'):
         command.extend(['-s', args.count_strand])
     
     if hasattr(args, 'output') and args.output:
         command.extend(['-o', args.output])
+    
+    if hasattr(args, 'test') and args.test:
+        command.append('-t')
 
     try:
         subprocess.run(command, check=True)
@@ -133,16 +204,29 @@ def add_parser(subparsers):
     parser.add_argument('-s', '--count_strand', type=str, default="F", choices=['F', 'R', 'B'],
                         help='Strand to count: F (forward), R (reverse), B (both). Default: F')
     parser.add_argument('-o', '--output', type=str, help='Path to the output file. If not specified, uses input_bam + ".count"')
+    parser.add_argument('-t', '--test', action='store_true',
+                       help='Test mode: randomly sample 10000 reads for assessment')
+    parser.add_argument('-d', '--dna', action='store_true',
+                       help='Indicate if reads are mapped to DNA sequence')
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
     parser = argparse.ArgumentParser(description='Count reads in RNA-seq BAM file')
     parser.add_argument('input_bam', type=str, help='Path to the input indexed BAM file.')
     parser.add_argument('-s', '--count_strand', type=str, default="F", choices=['F', 'R', 'B'],
                         help='Strand to count: F (forward), R (reverse), B (both). Default: F')
     parser.add_argument('-o', '--output', type=str, help='Path to the output file. If not specified, uses input_bam + ".count"')
+    parser.add_argument('-t', '--test', action='store_true',
+                       help='Test mode: randomly sample 10000 reads for assessment')
+    parser.add_argument('-d', '--dna', action='store_true',
+                       help='Indicate if reads are mapped to DNA sequence')
     args = parser.parse_args()
 
     if args.output is None:
         args.output = args.input_bam + ".count"
 
-    run(args.input_bam, args.count_strand, args.output)
+    if args.test:
+        logging.info("Running test mode...")
+        run_test(args.input_bam, args.count_strand, args.output, args.dna)
+    else:
+        run(args.input_bam, args.count_strand, args.output, args.dna)
