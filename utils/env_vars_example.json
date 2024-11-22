@@ -1,0 +1,8 @@
+// please replace to your own path
+// rename this file to env_vars.json 
+// and delete this comment
+{
+    "samtools": "xxxxx/envs/bin/samtools",
+    "pysam": "xxxxx/envs/bin/python",
+    "rscript": "xxxxx/envs/R/bin/Rscript"
+}
