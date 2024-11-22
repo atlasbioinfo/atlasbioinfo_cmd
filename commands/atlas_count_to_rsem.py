@@ -12,7 +12,7 @@ def countdown(seconds):
         
 def main():
     print("This script is a pre-step for DESEQ2 to convert all counts to rsem format files, please make sure your data is RNA-Seq or Polysome data.")
-    countdown(5)
+    countdown(3)
     genelist={}
     file_count=0
     for file in os.listdir("./"):
@@ -50,7 +50,8 @@ def main():
                         tmp[2],"0","0","0"
                     ])+"\n")
 
-    
+def add_parser(subparsers):
+    parser = subparsers.add_parser('count2rsem', help='Convert all counts to rsem format files')
 
             
 if __name__=="__main__":

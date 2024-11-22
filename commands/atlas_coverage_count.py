@@ -1,9 +1,8 @@
 #!/Users/hyu/Intel_miniforge3/envs/PYSAM/bin/python
 # -*- coding: utf-8 -*-
-
-import os,re,sys,pysam,time
-import numpy as np
 import argparse
+from pathlib import Path
+import logging
 
 def checkread(read): #reverse strand
     # if not read.is_paired:
@@ -23,6 +22,9 @@ def combine4Arr(arrs):
     return ",".join(cArr)
 
 def main(input_file, output, reads_all, fasta):
+    import os,re,sys,pysam,time
+    import numpy as np
+    
     if (fasta is not None):
         seq={}
         with open(fasta) as f:
@@ -90,35 +92,53 @@ def main(input_file, output, reads_all, fasta):
     
     print("Time elapsed: "+str(time.time()-beg)+"s")
 
-if __name__=="__main__":
+def run(pysam_python, args):
+    import subprocess
+    if pysam_python is None:
+        print("Error: pysam_python path is None. Please make sure the pysam environment is properly set up.")
+        return
 
-    logo='''      
-          _   _             ____  _       _        __      
-     /\  | | | |           |  _ \(_)     (_)      / _|     
-    /  \ | |_| | __ _ ___  | |_) |_  ___  _ _ __ | |_ ___  
-   / /\ \| __| |/ _` / __| |  _ <| |/ _ \| | '_ \|  _/ _ \ 
-  / ____ \ |_| | (_| \__ \ | |_) | | (_) | | | | | || (_) |
- /_/    \_\__|_|\__,_|___/ |____/|_|\___/|_|_| |_|_| \___/  
+    script_path = Path(__file__).resolve()
+    command = [pysam_python, str(script_path)]  # Start with base command
+    command.append(args.input_bam)
 
-        `-:-.   ,-;"`-:-.   ,-;"`-:-.   ,-;"`-:-.   ,-;"
-        `=`,'=/     `=`,'=/     `=`,'=/     `=`,'=/
-            y==/        y==/        y==/        y==/
-        ,=,-<=`.    ,=,-<=`.    ,=,-<=`.    ,=,-<=`.
-        ,-'-'   `-=_,-'-'   `-=_,-'-'   `-=_,-'-'   `-=_
-                
-    '''
+    if args.output:
+        command.extend(['-o', args.output])
+    else:
+        default_output = args.input_bam + '.AtlasCovRT'
+        command.extend(['-o', default_output])
+    
+    if args.fasta:
+        command.extend(['-f', args.fasta])
+    
+    if args.all:
+        command.extend(['-a', str(args.all)])
+    # print(" ".join(command))
+    try:
+        subprocess.run(command, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error running atlas coverage count: {e}")
+    except FileNotFoundError:
+        print(f"Error: Could not find the pysam Python interpreter at {pysam_python}")
 
-
-    description_text = '''{} 
-"atlas_coverage_count" processes a "indexed BAM" file to calculate and output the coverage and position counts for each reference, discarding reverse strand reads, and saves the statistics in a ".count" appended file, with a tab-separated format of Reference Name, position counts, and cumulative coverages. '''.format(logo)
-
-    parser = argparse.ArgumentParser(description=description_text, formatter_class=argparse.RawTextHelpFormatter)
+def add_parser(subparsers):
+    parser = subparsers.add_parser('cov_rt_count', help='Calculate coverage and position counts for each reference in a BAM file')
     parser.add_argument('input_bam', type=str, help='Path to the input indexed BAM file.')
     parser.add_argument('-f', '--fasta', type=str, default=None, help='Path to the reference fasta file, default is None')
     parser.add_argument('-o', '--output', type=str, default=None, help='output file name, default is input_file.AtlasCovRT')
     parser.add_argument('-a', '--all', type=bool, default=False, help='output all reads, include the antisense stranded reads, default is False')
-    
+    parser.set_defaults(func=run)
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+    parser = argparse.ArgumentParser(description='Calculate coverage and position counts for each reference in a BAM file')
+    parser.add_argument('input_bam', type=str, help='Path to the input indexed BAM file.')
+    parser.add_argument('-f', '--fasta', type=str, default=None, help='Path to the reference fasta file, default is None')
+    parser.add_argument('-o', '--output', type=str, default=None, help='output file name, default is input_file.AtlasCovRT')
+    parser.add_argument('-a', '--all', type=bool, default=False, help='output all reads, include the antisense stranded reads, default is False')
     args = parser.parse_args()
+
     if args.output is None:
-        args.output = args.input_bam + ".AtlasCovRT"
+        args.output = args.input_bam + '.AtlasCovRT'
+    
     main(args.input_bam, args.output, args.all, args.fasta)

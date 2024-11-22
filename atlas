@@ -5,7 +5,7 @@ import json, os, sys
 import subprocess
 import logging
 from pathlib import Path
-from commands import sam2bam, initialize, bamindex, count_rnaseq
+from commands import sam2bam, initialize, bamindex, count_rnaseq, atlas_count_to_rsem, atlas_deseq2_fpkm, atlas_coverage_count
 
 
 
@@ -56,6 +56,9 @@ def generate_parser():
     initialize.add_parser(subparsers)
     bamindex.add_parser(subparsers)
     count_rnaseq.add_parser(subparsers)
+    atlas_count_to_rsem.add_parser(subparsers)
+    atlas_deseq2_fpkm.add_parser(subparsers)
+    atlas_coverage_count.add_parser(subparsers)
     # check_big_file.add_subparser(subparsers)
     # dmsmap.add_subparser(subparsers)
     # cov_rt_count.add_subparser(subparsers)
@@ -70,6 +73,7 @@ def main():
     
     # Get the pysam environment's Python interpreter path
     pysam_python = env_args.get('pysam')
+    rscript = env_args.get('rscript')
     if not pysam_python:
         logging.error("pysam Python path not found in env_vars.json. Please run 'atlas init' first.")
         exit(1)
@@ -83,6 +87,9 @@ def main():
         'sam2bam': lambda: sam2bam.run(env_args['samtools'], args.threads),
         'bamindex': lambda: bamindex.run(env_args['samtools']),
         'count_rnaseq': lambda: count_rnaseq.run_count_rnaseq_with_pysam(pysam_python, args),
+        'count2rsem': lambda: atlas_count_to_rsem.main(),
+        'deseq2fpkm': lambda: atlas_deseq2_fpkm.run(args.input, args.output, args.filter, rscript),
+        'cov_rt_count': lambda: atlas_coverage_count.run(pysam_python, args)
     }
     
     if args.command in command_map:
