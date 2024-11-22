@@ -19,15 +19,23 @@ Atlas is a comprehensive bioinformatics toolkit designed to streamline various g
    git clone https://github.com/yourusername/atlas-bioinformatics-toolkit.git
    ```
 
-2. Set up the Conda environment:
+2. Set up the Conda environment (please install miniforge3 first):
+   add channels
    ```
-   mamba install python=3.11
-   mamba install -c bioconda bowtie2 hisat2 samtools
+   conda config --add channels conda-forge
+   conda config --add channels defaults
+   conda config --add channels r
+   conda config --add channels bioconda
    ```
 
-3. Activate the environment:
+   install python and packages
    ```
-   conda activate ATLAS
+   mamba create -n ATLAS python pysam hisat2 samtools bedtools cufflinks r-base
+   ```
+
+1. Activate the environment:
+   ```
+   mamba activate ATLAS
    ```
 
 ## Usage
@@ -39,48 +47,13 @@ python atlas [command] [options]
 ```
 
 Available commands:
-
-- `sam2bam`: Convert SAM files to BAM format
-- `bamindex`: Index BAM files
-- `check_big_file`: Identify and optionally compress large files
-- `dmsmap`: Process DMS-MaP data
-- `cov_rt_count`: Calculate coverage and RT counts
-- `fastqc`: Perform quality control on FASTQ files
+..TO BE ADDED..
 
 For detailed usage of each command, use the `-h` or `--help` option:
 
 ```
 python atlas [command] -h
 ```
-
-## Configuration
-
-The `config.json` file contains important configuration settings, such as the path to the local Python interpreter. Ensure this file is properly set up before running Atlas commands.
-
-## File Structure
-
-- `atlas`: Main entry script
-- `commands/`: Directory containing individual command scripts
-- `environment.yml`: Conda environment specification
-- `config.json`: Configuration file
-- `LICENSE`: MIT License file
-
-## Examples
-
-1. Convert SAM to BAM:
-   ```
-   python atlas sam2bam -s /path/to/samtools -t 8
-   ```
-
-2. Calculate coverage:
-   ```
-   python atlas cov_rt_count input.bam -o output.AtlasCovRT
-   ```
-
-3. Download files from AWS S3:
-   ```
-   python atlas aws_autodownload -c config_file.txt -l ./local_directory
-   ```
 
 ## Contributing
 
