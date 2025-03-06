@@ -31,7 +31,7 @@ def main(input_file, output, reads_all, fasta):
             fcont=f.read().split(">")
             for cont in fcont[1:]:
                 tmp=cont.split("\n")
-                tname=re.split("\s+",tmp[0])[0]
+                tname=re.split(r"\s+",tmp[0])[0]
                 # tname=tmp[0].split(" ")[0]
                 tseq="".join(tmp[1:])
                 seq[tname]=tseq.upper()

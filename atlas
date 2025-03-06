@@ -1,4 +1,4 @@
-#!/Users/hyu/Intel_miniforge3/envs/ATLAS/bin/python
+#!/usr/users/JIC_c1/hyu/miniforge3/envs/ATLAS/bin/python
 
 import argparse, argcomplete
 import json, os, sys
@@ -73,6 +73,7 @@ def main():
     
     # Get the pysam environment's Python interpreter path
     pysam_python = env_args.get('pysam')
+    newpysam_python = env_args.get('pysam2')
     rscript = env_args.get('rscript')
     if not pysam_python:
         logging.error("pysam Python path not found in env_vars.json. Please run 'atlas init' first.")
@@ -89,7 +90,7 @@ def main():
         'count_rnaseq': lambda: count_rnaseq.run_count_rnaseq_with_pysam(pysam_python, args),
         'count2rsem': lambda: atlas_count_to_rsem.main(),
         'deseq2fpkm': lambda: atlas_deseq2_fpkm.run(args.input, args.output, args.filter, rscript),
-        'cov_rt_count': lambda: atlas_coverage_count.run(pysam_python, args)
+        'cov_rt_count': lambda: atlas_coverage_count.run(newpysam_python, args)
     }
     
     if args.command in command_map:

@@ -30,12 +30,16 @@ Atlas is a comprehensive bioinformatics toolkit designed to streamline various g
 
    install python and packages
    ```
-   mamba create -n ATLAS python pysam hisat2 samtools bedtools cufflinks r-base
+   mamba create -n ATLAS python pysam hisat2 samtools=1.9 r-base argcomplete
    ```
 
-1. Activate the environment:
+3. Install R packages
    ```
-   mamba activate ATLAS
+   R
+   if (!require("BiocManager", quietly = TRUE))
+         install.packages("BiocManager")
+   BiocManager::install("DESeq2")
+   BiocManager::install("tximport")
    ```
 
 ## Usage
